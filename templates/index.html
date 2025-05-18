@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuickBill - Invoice Generator</title>
+    <link rel="stylesheet" href="./static/style.css" />
+</head>
+
+<body>
+    <h1>QuickBill - Invoice Generator</h1>
+    <hr>
+
+    <form id="invoice-form" method="POST" action="/generate_invoice" enctype="multipart/form-data">
+        <label for="company_name">Your Company Name:</label>
+        <input type="text" id="company_name" name="company_name" required>
+
+        <label for="logo">Upload Company Logo:</label>
+        <input type="file" id="logo" name="logo" accept="image/*" />
+
+        <h2>Client Info</h2>
+        <label>
+            Name:
+            <input type="text" name="client_name" required />
+        </label>
+        <label>
+            Email:
+            <input type="email" name="client_email" required />
+        </label>
+        <label>
+            Address:
+            <input type="text" name="client_address" />
+        </label>
+
+        <h2>Invoice Items</h2>
+        <div class="items" id="items-container">
+            <div class="item-row">
+                <input type="text" name="item_name" placeholder="Item name" required />
+                <input type="number" name="item_qty" placeholder="Quantity" min="1" required />
+                <input type="number" name="item_price" placeholder="Price" min="0" step="0.01" required />
+                <button type="button" onclick="removeItem(this)">Remove</button>
+            </div>
+        </div>
+
+        <button type="button" class="add-item-btn" onclick="addItem()">+ Add Item</button>
+
+        <h2>Currency</h2>
+        <label for="currency">Select Currency:</label>
+        <select id="currency" name="currency">
+            <option value="$" selected>USD ($)</option>
+            <option value="₦">NGN (₦)</option>
+            <option value="€">EUR (€)</option>
+            <option value="£">GBP (£)</option>
+            <option value="¥">JPY (¥)</option>
+            <option value="₹">INR (₹)</option>
+            <option value="₩">KRW (₩)</option>
+            <option value="₽">RUB (₽)</option>
+            <option value="₺">TRY (₺)</option>
+            <option value="₪">ILS (₪)</option>
+            <option value="₫">VND (₫)</option>
+        </select>
+
+        <h2>Signature</h2>
+        <canvas id="signature-pad" width="400" height="150" style="border:1px solid #ccc;"></canvas><br>
+        <button type="button" onclick="clearSignature()">Clear Signature</button>
+        <input type="hidden" name="signature_data" id="signature_data" />
+
+        <label for="due_date">Payment Due Date:</label>
+        <input type="date" id="due_date" name="due_date" required>
+
+        <label for="filename">Filename (e.g., invoice.pdf):</label>
+        <input type="text" id="filename" name="filename" value="invoice.pdf" />
+
+        <br><br>
+        <button type="submit" class="submit-btn">Generate Invoice PDF</button>
+    </form>
+
+    <script>
+        function removeItem(button) {
+            const container = document.getElementById('items-container');
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+            } else {
+                alert('At least one invoice item is required.');
+            }
+        }
+
+        function addItem() {
+            const container = document.getElementById('items-container');
+            const newItem = document.createElement('div');
+            newItem.classList.add('item-row');
+            newItem.innerHTML = `
+                <input type="text" name="item_name" placeholder="Item name" required />
+                <input type="number" name="item_qty" placeholder="Quantity" min="1" required />
+                <input type="number" name="item_price" placeholder="Price" min="0" step="0.01" required />
+                <button type="button" onclick="removeItem(this)">Remove</button>
+            `;
+            container.appendChild(newItem);
+        }
+
+        // Signature pad setup
+        const canvas = document.getElementById('signature-pad');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        canvas.addEventListener('mousedown', () => {
+            drawing = true;
+            ctx.beginPath();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            drawing = false;
+            saveSignature();
+        });
+
+        canvas.addEventListener('mouseout', () => {
+            drawing = false;
+        });
+
+        canvas.addEventListener('mousemove', draw);
+
+        function draw(event) {
+            if (!drawing) return;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000';
+            ctx.lineTo(event.offsetX, event.offsetY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(event.offsetX, event.offsetY);
+        }
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('signature_data').value = '';
+        }
+
+        function saveSignature() {
+            const dataURL = canvas.toDataURL('image/png');
+            document.getElementById('signature_data').value = dataURL;
+        }
+
+        // Before form submit, save canvas as base64 string
+        document.getElementById('invoice-form').addEventListener('submit', function (e) {
+            saveSignature();
+        });
+    </script>
+</body>
+
+</html>

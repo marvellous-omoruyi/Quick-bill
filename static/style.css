@@ -1,0 +1,58 @@
+body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 40px auto;
+}
+
+h1 {
+    text-align: center;
+}
+
+label {
+    display: block;
+    margin-top: 15px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="number"] {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    box-sizing: border-box;
+}
+
+.items {
+    margin-top: 20px;
+}
+
+.item-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.item-row input {
+    flex: 1;
+}
+
+button {
+    margin-top: 20px;
+    padding: 10px 15px;
+    cursor: pointer;
+}
+
+.add-item-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+}
+
+.submit-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+}
+#signature-pad {
+    border: 1px solid #000;
+}
