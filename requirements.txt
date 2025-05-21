@@ -3,3 +3,5 @@ Flask-SQLAlchemy
 Pillow
 reportlab
 qrcode
+gunicorn
+# other dependencies...
