@@ -23,15 +23,9 @@ def index():
 @app.route('/generate_invoice', methods=['POST'])
 def generate_invoice():
     # Extract client info from form data
-    logo_file = request.files.get('logo')
-    logo_path = None
-    if logo_file and logo_file.filename != '':
-        filename = secure_filename(logo_file.filename)
-        os.makedirs('uploads', exist_ok=True)
-        logo_path = os.path.abspath(os.path.join('uploads', filename))
-        logo_file.save(logo_path)
     client_data = {
         'company_name': request.form.get('company_name', '').strip(),
+        
         'name': request.form.get('client_name', '').strip(),
         'address': request.form.get('client_address', '').strip(),
         'email': request.form.get('client_email', '').strip(),
@@ -39,11 +33,31 @@ def generate_invoice():
         'invoice_number': request.form.get('invoice_number', '').strip(),
         'date': request.form.get('invoice_date', '').strip(),
         'due_date': request.form.get('due_date', '').strip(),
-        'logo_path': logo_path
     }
 
     # Optional signature image as base64 data URL
     signature_data_url = request.form.get('signature_data', None)
+    signature_file = request.files.get('signature_image', None)
+
+    signature_bytes = None
+    if signature_file and signature_file.filename != '':
+        signature_bytes = signature_file.read()
+    elif signature_data_url:
+        import base64
+        header, encoded = signature_data_url.split(',', 1)
+        signature_bytes = base64.b64decode(encoded)
+    comp_data_url = request.form.get('comp_data', None)
+    comp_file = request.files.get('comp_image', None)
+
+    comp_bytes = None
+    if comp_file and comp_file.filename != '':
+        comp_bytes = comp_file.read()
+    elif comp_data_url:
+        import base64
+        header, encoded = comp_data_url.split(',', 1)
+        comp_bytes = base64.b64decode(encoded)
+
+    print("Signature bytes present:", comp_bytes is not None and len(comp_bytes) > 0)
 
     # Extract invoice items from form data
     item_names = request.form.getlist('item_name')
@@ -86,10 +100,12 @@ def generate_invoice():
 
     # Generate the invoice PDF bytes buffer
     pdf_buffer = create_invoice_pdf_bytes(
+        
         client_data,
         items,
+        comp_bytes=comp_bytes,
         currency_symbol=currency_symbol,
-        signature_data_url=signature_data_url,
+        signature_bytes=signature_bytes,  # <-- update your function to accept this
         due_date=client_data.get('due_date'),
         due_on_receipt=not bool(client_data.get('due_date'))
     )
@@ -102,5 +118,13 @@ def generate_invoice():
     return send_file(pdf_path, as_attachment=True, download_name=filename)
 
 
+import webbrowser
+import threading
+import base64  # move to global imports
+
 if __name__ == "__main__":
+    def open_browser():
+        webbrowser.open_new("http://127.0.0.1:5000")
+
+    threading.Timer(1.25, open_browser).start()
     app.run(debug=True)

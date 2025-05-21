@@ -3,6 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 import io
+from io import BytesIO
 import base64
 from PIL import Image
 import uuid
@@ -18,14 +19,11 @@ def generate_qr_code_image(data, size=100):
     img = img.resize((size, size), Image.Resampling.LANCZOS)
     return img
 
-def create_invoice_pdf_bytes(client_data, items, currency_symbol='$', signature_data_url=None,
+def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbol='$', signature_bytes=None,
                              due_on_receipt=True, due_date=None, logo_path=None):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
-
-    # Generate unique invoice ID (UUID4)
-    invoice_id = str(uuid.uuid4())
 
     # Margins
     left_margin = 1 * inch
@@ -33,167 +31,148 @@ def create_invoice_pdf_bytes(client_data, items, currency_symbol='$', signature_
     top_margin = height - 1 * inch
     bottom_margin = 1 * inch
 
-    # Draw company name - larger and bold, aligned left top
+    # --- HEADER: Company Name (left) and Logo (right) ---
     c.setFont("Helvetica-Bold", 24)
     c.drawString(left_margin, top_margin, client_data.get('company_name', ''))
-
-    # Draw logo if provided and file exists
-    if logo_path and os.path.isfile(logo_path):
+    logo_drawn_height = 0
+    if comp_bytes:
         try:
-            logo_img = Image.open(logo_path)
+            comp_img = Image.open(BytesIO(comp_bytes))
+            comp_img_reader = ImageReader(comp_img)
+            img_width, img_height = comp_img.size
             max_width = 2 * inch
             max_height = 1 * inch
-            logo_width, logo_height = logo_img.size
-            aspect = logo_width / logo_height
-
-            # Resize logo maintaining aspect ratio within max dimensions
-            if logo_width > max_width or logo_height > max_height:
+            # Resize if needed
+            if img_width > max_width or img_height > max_height:
+                aspect = img_width / img_height
                 if (max_width / aspect) <= max_height:
                     new_width = max_width
                     new_height = max_width / aspect
                 else:
                     new_height = max_height
                     new_width = max_height * aspect
-                logo_img = logo_img.resize((int(new_width), int(new_height)), Image.Resampling.LANCZOS)
-            else:
-                new_width, new_height = logo_width, logo_height
-
-            logo_reader = ImageReader(logo_img)
-            # Draw logo top-right with 1 inch margin, aligned vertically to company name
-            c.drawImage(logo_reader, right_margin - new_width, top_margin - new_height / 2,
-                        width=new_width, height=new_height, mask='auto')
+                comp_img = comp_img.resize((int(new_width), int(new_height)))
+                img_width, img_height = comp_img.size
+                comp_img_reader = ImageReader(comp_img)
+            x = right_margin - img_width
+            y = top_margin - img_height + 20
+            c.drawImage(comp_img_reader, x, y, width=img_width, height=img_height, mask='auto')
+            logo_drawn_height = img_height
         except Exception as e:
-            print(f"Error loading logo image: {e}")
+            print("Error loading company logo:", e)
 
-    # Draw Invoice title
+    # --- INVOICE TITLE ---
     c.setFont("Helvetica-Bold", 26)
     c.drawString(left_margin, top_margin - 40, "INVOICE")
 
-    # Invoice ID and Date - right aligned under logo
-    c.setFont("Helvetica", 10)
-    c.drawRightString(right_margin, top_margin - 15, f"Invoice ID: {invoice_id}")
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.drawRightString(right_margin, top_margin - 30, f"Date: {now}")
-
-    # Draw QR code below invoice ID and date
-    qr_img = generate_qr_code_image(invoice_id, size=80)
+    # --- QR, Invoice ID, Date ---
+    info_y = top_margin - 70
+    qr_img = generate_qr_code_image(client_data.get('invoice_number', '') or "INV", size=40)
     qr_img_reader = ImageReader(qr_img)
-    c.drawImage(qr_img_reader, right_margin - 80, top_margin - 120, width=80, height=80)
+    c.drawImage(qr_img_reader, left_margin, info_y - 10, width=40, height=40)
+    c.setFont("Helvetica", 10)
+    c.setFillColorRGB(0.2, 0.2, 0.2)
+    invoice_id = client_data.get('invoice_number', '') or str(uuid.uuid4())
+    c.drawString(left_margin + 50, info_y + 10, f"Invoice ID: {invoice_id}")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.drawString(left_margin + 50, info_y - 5, f"Date: {now}")
+    c.setFillColorRGB(0, 0, 0)
 
-    # Draw horizontal line under header
+    # --- HORIZONTAL LINE ---
     c.setLineWidth(1)
-    c.line(left_margin, top_margin - 130, right_margin, top_margin - 130)
+    c.line(left_margin, top_margin - 95, right_margin, top_margin - 95)
 
-    # Client Information block
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(left_margin, top_margin - 150, "Bill To:")
-    c.setFont("Helvetica", 12)
-    c.drawString(left_margin, top_margin - 170, client_data.get('name', ''))
-    c.drawString(left_margin, top_margin - 185, client_data.get('email', ''))
-    c.drawString(left_margin, top_margin - 200, client_data.get('address', ''))
+    # --- CLIENT & PAYMENT INFO (two columns) ---
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(left_margin, top_margin - 110, "Bill To:")
+    c.setFont("Helvetica", 11)
+    c.drawString(left_margin, top_margin - 125, client_data.get('name', ''))
+    c.drawString(left_margin, top_margin - 140, client_data.get('address', ''))
+    c.drawString(left_margin, top_margin - 155, client_data.get('email', ''))
+    c.drawString(left_margin, top_margin - 170, client_data.get('phone', ''))
 
-    # Payment due info on right side aligned vertically with client info
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(right_margin - 200, top_margin - 150, "Payment Details:")
-    c.setFont("Helvetica", 12)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(right_margin - 180, top_margin - 110, "Payment Details:")
+    c.setFont("Helvetica", 11)
     due_text = due_date if due_date else "Due on Receipt"
-    c.drawString(right_margin - 200, top_margin - 170, f"Payment Due Date: {due_text}")
+    c.drawString(right_margin - 180, top_margin - 125, f"Payment Due Date: {due_text}")
 
-    # Draw line separating client/payment details from items table
+    # --- HORIZONTAL LINE ---
     c.setLineWidth(0.5)
-    c.line(left_margin, top_margin - 215, right_margin, top_margin - 215)
+    c.line(left_margin, top_margin - 185, right_margin, top_margin - 185)
 
-    # Table headers for items
-    c.setFont("Helvetica-Bold", 14)
-    y = top_margin - 235
+    # --- ITEMS TABLE ---
+    c.setFont("Helvetica-Bold", 12)
+    y = top_margin - 200
     c.drawString(left_margin, y, "Item Description")
     c.drawRightString(left_margin + 3.3 * inch, y, "Quantity")
     c.drawRightString(left_margin + 4.8 * inch, y, "Unit Price")
     c.drawRightString(right_margin, y, "Total")
-
-    # Draw underline for headers
-    c.setLineWidth(1)
+    c.setLineWidth(0.5)
     c.line(left_margin, y - 5, right_margin, y - 5)
-
-    # Draw items
-    c.setFont("Helvetica", 12)
+    c.setFont("Helvetica", 11)
     y -= 20
     total_amount = 0
     for item in items:
         total = item['quantity'] * item['price']
         c.drawString(left_margin, y, item['name'])
         c.drawRightString(left_margin + 3.3 * inch, y, str(item['quantity']))
-        # Ensure currency symbol is a string and doesn't cause black fill issues
         c.drawRightString(left_margin + 4.8 * inch, y, f"{currency_symbol}{item['price']:.2f}")
         c.drawRightString(right_margin, y, f"{currency_symbol}{total:.2f}")
         y -= 18
         total_amount += total
 
-    # Draw total amount with emphasis
+    # --- TOTALS ---
     y -= 10
     c.setLineWidth(0.8)
     c.line(left_margin + 3.3 * inch, y, right_margin, y)
     y -= 15
-    c.setFont("Helvetica-Bold", 16)
+    c.setFont("Helvetica-Bold", 14)
     c.drawString(left_margin + 3.3 * inch, y, "Total Amount:")
     c.drawRightString(right_margin, y, f"{currency_symbol}{total_amount:.2f}")
 
-    # Payment due on receipt note
+    # --- PAYMENT NOTE ---
     if due_on_receipt and not due_date:
         y -= 30
         c.setFont("Helvetica-Oblique", 12)
-        c.setFillColorRGB(0.5, 0, 0)  # Dark red color for emphasis
+        c.setFillColorRGB(0.5, 0, 0)
         c.drawString(left_margin, y, "Payment Due: Due on Receipt")
-        c.setFillColorRGB(0, 0, 0)  # Reset color to black
+        c.setFillColorRGB(0, 0, 0)
 
-    # Draw signature block if provided
-    if signature_data_url:
+    # --- SIGNATURE ---
+    if signature_bytes:
         try:
-            header, encoded = signature_data_url.split(',', 1)
-            signature_bytes = base64.b64decode(encoded)
-            image_stream = io.BytesIO(signature_bytes)
-            signature_image = Image.open(image_stream).convert("RGBA")
-
+            signature_img = Image.open(BytesIO(signature_bytes))
+            sig_width, sig_height = signature_img.size
             max_width = 2 * inch
             max_height = 1 * inch
-            sig_width, sig_height = signature_image.size
-            aspect = sig_width / sig_height
-
-            max_width_px = int(max_width)
-            max_height_px = int(max_height)
-
-            if sig_width > max_width_px or sig_height > max_height_px:
-                if (max_width_px / aspect) <= max_height_px:
-                    sig_width_new = max_width_px
-                    sig_height_new = int(max_width_px / aspect)
+            if sig_width > max_width or sig_height > max_height:
+                aspect = sig_width / sig_height
+                if (max_width / aspect) <= max_height:
+                    new_width = max_width
+                    new_height = max_width / aspect
                 else:
-                    sig_height_new = max_height_px
-                    sig_width_new = int(max_height_px * aspect)
-                signature_image = signature_image.resize((sig_width_new, sig_height_new), Image.Resampling.LANCZOS)
-                sig_width, sig_height = sig_width_new, sig_height_new
-
-            signature_img_reader = ImageReader(signature_image)
-            # Place signature near bottom left above bottom margin
-            sig_y = bottom_margin + 40
+                    new_height = max_height
+                    new_width = max_height * aspect
+                signature_img = signature_img.resize((int(new_width), int(new_height)))
+                sig_width, sig_height = signature_img.size
+            signature_img_reader = ImageReader(signature_img)
+            sig_y = bottom_margin + 60
             c.drawImage(signature_img_reader, left_margin, sig_y, width=sig_width, height=sig_height, mask='auto')
-
             c.setFont("Helvetica", 10)
             c.drawString(left_margin, sig_y - 15, "Authorized Signature:")
-
         except Exception as e:
-            # skip gracefully if signature decode or render fails
             pass
 
-    # Footer line and page number or company info
+    # --- FOOTER ---
     c.setStrokeColorRGB(0.6, 0.6, 0.6)
     c.setLineWidth(0.5)
     c.line(left_margin, bottom_margin + 20, right_margin, bottom_margin + 20)
-
     c.setFont("Helvetica-Oblique", 8)
     c.setFillColorRGB(0.3, 0.3, 0.3)
     footer_text = client_data.get('company_name', '') + " - Invoice generated by QuickBill"
     c.drawCentredString(width / 2, bottom_margin + 8, footer_text)
-    c.setFillColorRGB(0, 0, 0)  # reset to black
+    c.setFillColorRGB(0, 0, 0)
 
     c.save()
     buffer.seek(0)
