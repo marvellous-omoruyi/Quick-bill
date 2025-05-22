@@ -9,6 +9,32 @@
     <title>QuickBill - Invoice Generator</title>
     <meta name="description"
         content="QuickBill is a fast, modern invoice generator. Create, sign, and download professional invoices as PDF.">
+    <meta name="keywords"
+        content="invoice generator, free invoice maker, online invoice, PDF invoice, create invoice, QuickBill, business invoice, digital signature invoice, professional invoice, billing, QuickBill app, invoice PDF, company invoice, client invoice, PWA invoice app">
+
+    <!-- Allow search engines to index and follow links -->
+    <meta name="robots" content="index, follow">
+
+    <!-- Canonical URL (replace with your actual URL) -->
+    <link rel="canonical" href="https://quick-bill.onrender.com/" />
+
+    <!-- Structured Data for Google Rich Results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "QuickBill - Invoice Generator",
+      "url": "https://quick-bill.onrender.com/",
+      "description": "QuickBill is a fast, modern invoice generator. Create, sign, and download professional invoices as PDF.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "All",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
 
     <!-- PWA Meta -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
