@@ -2,12 +2,36 @@
 <html lang="en">
 
 <head>
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
-    <meta name="theme-color" content="#007bff" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="google-site-verification" content="j4S06ctrP5zqa3qqqPkJOxNqcOJQqBDaw7l1P-Z7Bpo" />
+    <!-- Basic Meta -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>QuickBill - Invoice Generator</title>
+    <meta name="description"
+        content="QuickBill is a fast, modern invoice generator. Create, sign, and download professional invoices as PDF.">
+
+    <!-- PWA Meta -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#1e90ff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon2.png') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icons/icon.png') }}">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:title" content="QuickBill - Invoice Generator">
+    <meta property="og:description" content="Create, sign, and download professional invoices as PDF with QuickBill.">
+    <meta property="og:image" content="{{ url_for('static', filename='icons/icon.png') }}">
+    <meta property="og:url" content="https://quick-bill.onrender.com">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="QuickBill - Invoice Generator">
+    <meta name="twitter:description" content="Create, sign, and download professional invoices as PDF with QuickBill.">
+    <meta name="twitter:image" content="{{ url_for('static', filename='icons/icon.png') }}">
+
     <link rel="stylesheet" href="../static/bootstrap.min.css">
     <link rel="stylesheet" href="../static/style.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -265,6 +289,14 @@
         });
     </script>
     <script src="../static/bootstrap.bundle.min.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("/static/service-worker.js")
+                .then(reg => console.log("✅ Service Worker registered:", reg))
+                .catch(err => console.error("❌ Service Worker registration failed:", err));
+        }
+    </script>
+
 </body>
 
 </html>
