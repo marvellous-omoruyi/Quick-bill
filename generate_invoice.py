@@ -2,6 +2,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 import io
 from io import BytesIO
 import base64
@@ -10,6 +12,9 @@ import uuid
 import qrcode
 from datetime import datetime
 import os
+
+# Register Unicode font
+pdfmetrics.registerFont(TTFont('DejaVu', 'fonts/DejaVuSans.ttf'))
 
 def generate_qr_code_image(data, size=100):
     qr = qrcode.QRCode(box_size=2, border=1)
@@ -25,14 +30,12 @@ def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbo
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    # Margins
     left_margin = 1 * inch
     right_margin = width - 1 * inch
     top_margin = height - 1 * inch
     bottom_margin = 1 * inch
 
-    # --- HEADER: Company Name (left) and Logo (right) ---
-    c.setFont("Helvetica-Bold", 24)
+    c.setFont("DejaVu", 24)
     c.drawString(left_margin, top_margin, client_data.get('company_name', ''))
     logo_drawn_height = 0
     if comp_bytes:
@@ -42,7 +45,6 @@ def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbo
             img_width, img_height = comp_img.size
             max_width = 2 * inch
             max_height = 1 * inch
-            # Resize if needed
             if img_width > max_width or img_height > max_height:
                 aspect = img_width / img_height
                 if (max_width / aspect) <= max_height:
@@ -61,16 +63,14 @@ def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbo
         except Exception as e:
             print("Error loading company logo:", e)
 
-    # --- INVOICE TITLE ---
-    c.setFont("Helvetica-Bold", 26)
+    c.setFont("DejaVu", 26)
     c.drawString(left_margin, top_margin - 40, "INVOICE")
 
-    # --- QR, Invoice ID, Date ---
     info_y = top_margin - 70
     qr_img = generate_qr_code_image(client_data.get('invoice_number', '') or "INV", size=40)
     qr_img_reader = ImageReader(qr_img)
     c.drawImage(qr_img_reader, left_margin, info_y - 10, width=40, height=40)
-    c.setFont("Helvetica", 10)
+    c.setFont("DejaVu", 10)
     c.setFillColorRGB(0.2, 0.2, 0.2)
     invoice_id = client_data.get('invoice_number', '') or str(uuid.uuid4())
     c.drawString(left_margin + 50, info_y + 10, f"Invoice ID: {invoice_id}")
@@ -78,31 +78,27 @@ def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbo
     c.drawString(left_margin + 50, info_y - 5, f"Date: {now}")
     c.setFillColorRGB(0, 0, 0)
 
-    # --- HORIZONTAL LINE ---
     c.setLineWidth(1)
     c.line(left_margin, top_margin - 95, right_margin, top_margin - 95)
 
-    # --- CLIENT & PAYMENT INFO (two columns) ---
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("DejaVu", 12)
     c.drawString(left_margin, top_margin - 110, "Bill To:")
-    c.setFont("Helvetica", 11)
+    c.setFont("DejaVu", 11)
     c.drawString(left_margin, top_margin - 125, client_data.get('name', ''))
     c.drawString(left_margin, top_margin - 140, client_data.get('address', ''))
     c.drawString(left_margin, top_margin - 155, client_data.get('email', ''))
     c.drawString(left_margin, top_margin - 170, client_data.get('phone', ''))
 
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("DejaVu", 12)
     c.drawString(right_margin - 180, top_margin - 110, "Payment Details:")
-    c.setFont("Helvetica", 11)
+    c.setFont("DejaVu", 11)
     due_text = due_date if due_date else "Due on Receipt"
     c.drawString(right_margin - 180, top_margin - 125, f"Payment Due Date: {due_text}")
 
-    # --- HORIZONTAL LINE ---
     c.setLineWidth(0.5)
     c.line(left_margin, top_margin - 185, right_margin, top_margin - 185)
 
-    # --- ITEMS TABLE ---
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("DejaVu", 12)
     y = top_margin - 200
     c.drawString(left_margin, y, "Item Description")
     c.drawRightString(left_margin + 3.3 * inch, y, "Quantity")
@@ -110,7 +106,7 @@ def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbo
     c.drawRightString(right_margin, y, "Total")
     c.setLineWidth(0.5)
     c.line(left_margin, y - 5, right_margin, y - 5)
-    c.setFont("Helvetica", 11)
+    c.setFont("DejaVu", 11)
     y -= 20
     total_amount = 0
     for item in items:
@@ -122,24 +118,21 @@ def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbo
         y -= 18
         total_amount += total
 
-    # --- TOTALS ---
     y -= 10
     c.setLineWidth(0.8)
     c.line(left_margin + 3.3 * inch, y, right_margin, y)
     y -= 15
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont("DejaVu", 14)
     c.drawString(left_margin + 3.3 * inch, y, "Total Amount:")
     c.drawRightString(right_margin, y, f"{currency_symbol}{total_amount:.2f}")
 
-    # --- PAYMENT NOTE ---
     if due_on_receipt and not due_date:
         y -= 30
-        c.setFont("Helvetica-Oblique", 12)
+        c.setFont("DejaVu", 12)
         c.setFillColorRGB(0.5, 0, 0)
         c.drawString(left_margin, y, "Payment Due: Due on Receipt")
         c.setFillColorRGB(0, 0, 0)
 
-    # --- SIGNATURE ---
     if signature_bytes:
         try:
             signature_img = Image.open(BytesIO(signature_bytes))
@@ -159,16 +152,15 @@ def create_invoice_pdf_bytes(client_data, items, comp_bytes=None, currency_symbo
             signature_img_reader = ImageReader(signature_img)
             sig_y = bottom_margin + 60
             c.drawImage(signature_img_reader, left_margin, sig_y, width=sig_width, height=sig_height, mask='auto')
-            c.setFont("Helvetica", 10)
+            c.setFont("DejaVu", 10)
             c.drawString(left_margin, sig_y - 15, "Authorized Signature:")
         except Exception as e:
             pass
 
-    # --- FOOTER ---
     c.setStrokeColorRGB(0.6, 0.6, 0.6)
     c.setLineWidth(0.5)
     c.line(left_margin, bottom_margin + 20, right_margin, bottom_margin + 20)
-    c.setFont("Helvetica-Oblique", 8)
+    c.setFont("DejaVu", 8)
     c.setFillColorRGB(0.3, 0.3, 0.3)
     footer_text = client_data.get('company_name', '') + " - Invoice generated by QuickBill"
     c.drawCentredString(width / 2, bottom_margin + 8, footer_text)
